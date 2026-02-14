@@ -3,17 +3,20 @@ const router = express.Router();
 
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
-const { downloadReport } = require("../controllers/evidenceController");
+const allowRoles = require("../middleware/roleMiddleware");
 
 const {
   uploadEvidence,
   verifyEvidence,
   simulateTamper,
-  getAllEvidence
+  getAllEvidence,
+  downloadReport
 } = require("../controllers/evidenceController");
+
 
 // =======================================
 // Get All Evidence (Dashboard)
+// Roles: all authenticated users
 // =======================================
 router.get(
   "/",
@@ -21,18 +24,23 @@ router.get(
   getAllEvidence
 );
 
+
 // =======================================
 // Upload Evidence
+// Roles: admin, analyst
 // =======================================
 router.post(
   "/upload",
   authMiddleware,
+  allowRoles("admin", "analyst"),
   upload.single("file"),
   uploadEvidence
 );
 
+
 // =======================================
 // Verify Evidence
+// Roles: all authenticated users
 // =======================================
 router.get(
   "/verify/:id",
@@ -40,17 +48,27 @@ router.get(
   verifyEvidence
 );
 
+
 // =======================================
-// Simulate Tampering (Demo)
+// Simulate Tampering (DEMO PURPOSE)
+// Roles: admin only
 // =======================================
 router.post(
   "/tamper/:id",
   authMiddleware,
+  allowRoles("admin"),
   simulateTamper
 );
+
+
+// =======================================
+// Download Forensic Report (PDF)
+// Roles: admin, analyst, user
+// =======================================
 router.get(
   "/report/:id",
   authMiddleware,
+  allowRoles("admin", "analyst", "user"),
   downloadReport
 );
 

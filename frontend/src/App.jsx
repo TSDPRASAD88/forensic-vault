@@ -3,7 +3,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import VerifyPage from "./pages/VerifyPage";
 import AuditPage from "./pages/AuditPage";
-
+import Signup from "./pages/Signup";
+import AdminPanel from "./pages/AdminPanel";
 
 function App() {
   return (
@@ -13,6 +14,8 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/verify/:id" element={<VerifyPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/admin" element={<AdminPanel />} />
 
 
       </Routes>

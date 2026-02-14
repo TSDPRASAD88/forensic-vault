@@ -5,7 +5,6 @@ const authMiddleware = async (req, res, next) => {
   try {
     let token;
 
-    // 1️⃣ Get token from Authorization header
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -13,38 +12,38 @@ const authMiddleware = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
     }
 
-    // 2️⃣ If no token
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Access denied. No token provided."
+        message: "No token provided"
       });
     }
 
-    // 3️⃣ Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 4️⃣ Fetch user from database (excluding password)
+    console.log("✅ Decoded Token:", decoded);
+
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid token. User not found."
+        message: "User not found"
       });
     }
 
-    // 5️⃣ Attach user to request
+    console.log("✅ User from DB:", user.email, "| Role:", user.role);
+
     req.user = user;
 
     next();
 
   } catch (error) {
-    console.error("Auth Middleware Error:", error);
+    console.error("Auth Error:", error.message);
 
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired token."
+      message: "Invalid token"
     });
   }
 };
