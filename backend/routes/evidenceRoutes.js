@@ -3,6 +3,7 @@ const router = express.Router();
 
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
+const { downloadReport } = require("../controllers/evidenceController");
 
 const {
   uploadEvidence,
@@ -12,7 +13,7 @@ const {
 } = require("../controllers/evidenceController");
 
 // =======================================
-// Get All Evidence
+// Get All Evidence (Dashboard)
 // =======================================
 router.get(
   "/",
@@ -40,12 +41,18 @@ router.get(
 );
 
 // =======================================
-// Simulate Tampering (Demo Purpose)
+// Simulate Tampering (Demo)
 // =======================================
 router.post(
   "/tamper/:id",
   authMiddleware,
   simulateTamper
 );
+router.get(
+  "/report/:id",
+  authMiddleware,
+  downloadReport
+);
+
 
 module.exports = router;

@@ -4,6 +4,7 @@ const Audit = require("../models/Audit");
 const { generateFileHash } = require("../utils/hashUtils");
 const { signHash, verifySignature } = require("../utils/signatureUtils");
 const { createBlock, validateChain } = require("../utils/blockchainUtils");
+const { generateForensicPDF } = require("../utils/pdfReport");
 
 /**
  * Upload and store forensic evidence
@@ -66,7 +67,6 @@ exports.uploadEvidence = async (req, res) => {
   }
 };
 
-
 /**
  * Verify forensic evidence integrity
  */
@@ -83,7 +83,6 @@ exports.verifyEvidence = async (req, res) => {
       });
     }
 
-    // Check file existence
     if (!fs.existsSync(evidence.filePath)) {
       return res.status(400).json({
         success: false,
@@ -96,13 +95,13 @@ exports.verifyEvidence = async (req, res) => {
     const currentHash = generateFileHash(evidence.filePath);
     const hashMatch = currentHash === evidence.fileHash;
 
-    // Verify digital signature (use stored original hash)
+    // Verify signature using original stored hash
     const signatureValid = verifySignature(
       evidence.fileHash,
       evidence.digitalSignature
     );
 
-    // Validate blockchain integrity
+    // Validate blockchain
     const chainValidation = await validateChain();
 
     // Verify block linkage integrity
@@ -154,7 +153,6 @@ exports.verifyEvidence = async (req, res) => {
   }
 };
 
-
 /**
  * Simulate tampering (for demo/testing)
  */
@@ -169,7 +167,7 @@ exports.simulateTamper = async (req, res) => {
       });
     }
 
-    // Modify file artificially
+    // Artificially modify file
     fs.appendFileSync(evidence.filePath, "TAMPERED_DATA");
 
     await Audit.create({
@@ -194,7 +192,8 @@ exports.simulateTamper = async (req, res) => {
 };
 
 /**
- * Get all uploaded evidence (for dashboard listing)
+ * Get all evidence WITH integrity status
+ * 🔥 Used by dashboard badges
  */
 exports.getAllEvidence = async (req, res) => {
   try {
@@ -202,10 +201,45 @@ exports.getAllEvidence = async (req, res) => {
       .populate("uploadedBy", "name email role")
       .sort({ createdAt: -1 });
 
+    const chainValidation = await validateChain();
+
+    const result = evidenceList.map((evidence) => {
+      let hashMatch = false;
+      let signatureValid = false;
+
+      if (fs.existsSync(evidence.filePath)) {
+        const currentHash = generateFileHash(evidence.filePath);
+        hashMatch = currentHash === evidence.fileHash;
+
+        signatureValid = verifySignature(
+          evidence.fileHash,
+          evidence.digitalSignature
+        );
+      }
+
+      const blockIntegrity =
+        evidence.blockId &&
+        evidence.blockId.fileHash === evidence.fileHash;
+
+      const overallValid =
+        hashMatch &&
+        signatureValid &&
+        chainValidation.valid &&
+        blockIntegrity;
+
+      return {
+        _id: evidence._id,
+        fileName: evidence.fileName,
+        uploadedBy: evidence.uploadedBy,
+        createdAt: evidence.createdAt,
+        integrityStatus: overallValid ? "VALID" : "TAMPERED"
+      };
+    });
+
     res.json({
       success: true,
-      count: evidenceList.length,
-      data: evidenceList
+      count: result.length,
+      data: result
     });
 
   } catch (err) {
@@ -217,4 +251,54 @@ exports.getAllEvidence = async (req, res) => {
     });
   }
 };
+/**
+ * Download forensic report PDF
+ */
+exports.downloadReport = async (req, res) => {
+  try {
+    const evidence = await Evidence.findById(req.params.id)
+      .populate("uploadedBy", "name email role")
+      .populate("blockId");
 
+    if (!evidence) {
+      return res.status(404).json({ message: "Evidence not found" });
+    }
+
+    const currentHash = generateFileHash(evidence.filePath);
+    const hashMatch = currentHash === evidence.fileHash;
+
+    const signatureValid = verifySignature(
+      evidence.fileHash,
+      evidence.digitalSignature
+    );
+
+    const chainValidation = await validateChain();
+
+    const blockIntegrity =
+      evidence.blockId &&
+      evidence.blockId.fileHash === evidence.fileHash;
+
+    const overallValid =
+      hashMatch &&
+      signatureValid &&
+      chainValidation.valid &&
+      blockIntegrity;
+
+    const report = {
+      evidenceId: evidence._id,
+      fileName: evidence.fileName,
+      uploadedBy: evidence.uploadedBy,
+      uploadTimestamp: evidence.createdAt,
+      fileIntegrity: hashMatch,
+      signatureIntegrity: signatureValid,
+      blockchainIntegrity: chainValidation.valid,
+      blockLinkIntegrity: blockIntegrity,
+      tampered: !overallValid
+    };
+
+    generateForensicPDF(res, report);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

@@ -34,6 +34,36 @@ export default function VerifyPage() {
   }, [id]);
 
   // ===============================
+  // Download PDF Report
+  // ===============================
+  const downloadReport = async () => {
+  try {
+    const response = await api.get(
+      `/evidence/report/${id}`,
+      { responseType: "blob" }
+    );
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `forensic-report-${id}.pdf`
+    );
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to download report");
+  }
+};
+
+
+  // ===============================
   // UI Helpers
   // ===============================
   const StatusBadge = ({ status }) => (
@@ -150,6 +180,16 @@ export default function VerifyPage() {
               </div>
             )}
 
+          </div>
+
+          {/* Download Report Button */}
+          <div className="text-center pt-4">
+            <button
+              onClick={downloadReport}
+              className="bg-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Download Forensic Report (PDF)
+            </button>
           </div>
 
         </div>
