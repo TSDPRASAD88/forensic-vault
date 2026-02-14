@@ -21,6 +21,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/evidence", require("./routes/evidenceRoutes"));
 app.use("/api/audit", require("./routes/auditRoutes"));
 app.use("/api/blockchain", require("./routes/blockchainRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 
 app.listen(8070, () => console.log("Server running on port 8070"));

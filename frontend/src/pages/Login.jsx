@@ -21,6 +21,19 @@ export default function Login() {
   }, [navigate]);
 
   // ==========================
+  // Decode JWT safely
+  // ==========================
+  const decodeToken = (token) => {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload;
+    } catch (err) {
+      console.error("Token decode failed", err);
+      return null;
+    }
+  };
+
+  // ==========================
   // Handle Login
   // ==========================
   const handleLogin = async (e) => {
@@ -35,14 +48,34 @@ export default function Login() {
         password,
       });
 
+      const token = res.data.token;
+
       // Save token
-      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("token", token);
+      // fetch latest role from backend
+      const userRes = await api.get("/auth/me");
+
+      // Extract role & userId from JWT
+      const decoded = decodeToken(token);
+
+      if (decoded) {
+        localStorage.setItem("role", userRes.data.data.role);
+        localStorage.setItem("userId", userRes.data.data._id);
+
+      }
 
       navigate("/dashboard");
 
     } catch (err) {
       console.error(err);
-      setError("Invalid email or password.");
+
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err.message === "Network Error") {
+        setError("Cannot connect to server.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -53,9 +86,13 @@ export default function Login() {
 
       <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-96">
 
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">
+        <h2 className="text-2xl font-bold text-white mb-2 text-center">
           Forensic Evidence Vault
         </h2>
+
+        <p className="text-gray-400 text-sm text-center mb-6">
+          Secure Evidence Integrity & Verification
+        </p>
 
         <form onSubmit={handleLogin} className="space-y-4">
 
@@ -95,8 +132,19 @@ export default function Login() {
 
         </form>
 
-      </div>
+        {/* ✅ Register link */}
+        <p
+          onClick={() => navigate("/signup")}
+          className="text-center text-sm text-gray-400 mt-4 cursor-pointer hover:text-gray-200"
+        >
+          Don't have an account? Register
+        </p>
 
+        <p className="text-gray-500 text-xs text-center mt-4">
+          Role-based secure access enabled
+        </p>
+
+      </div>
     </div>
   );
 }
