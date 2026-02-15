@@ -14,10 +14,20 @@ export default function Login() {
   // Redirect if already logged in
   // ==========================
   useEffect(() => {
+   const checkAuth = async () => {
     const token = localStorage.getItem("token");
-    if (token) {
+
+    if (!token) return;
+
+    try {
+      await api.get("/auth/me"); // verify token with backend
       navigate("/dashboard");
+    } catch {
+      localStorage.clear(); // token invalid → remove
     }
+  };
+
+  checkAuth();
   }, [navigate]);
 
   // ==========================

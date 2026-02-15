@@ -21,7 +21,7 @@ const authMiddleware = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    console.log("✅ Decoded Token:", decoded);
+    // console.log("✅ Decoded Token:", decoded);
 
     const user = await User.findById(decoded.id).select("-password");
 
@@ -32,7 +32,7 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    console.log("✅ User from DB:", user.email, "| Role:", user.role);
+    // console.log("✅ User from DB:", user.email, "| Role:", user.role);
 
     req.user = user;
 

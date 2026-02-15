@@ -1,23 +1,21 @@
 import api from "./api";
 
 export const refreshUserRole = async () => {
+  const token = localStorage.getItem("token");
+
+  // 🚀 stop if not logged in
+  if (!token) return null;
+
   try {
     const res = await api.get("/auth/me");
 
     const newRole = res.data.data.role;
-    const oldRole = localStorage.getItem("role");
+    localStorage.setItem("role", newRole);
 
-    // ✅ If role changed → notify
-    if (oldRole && newRole !== oldRole) {
-      alert(`⚠️ Your permissions changed to "${newRole}"`);
-
-      localStorage.setItem("role", newRole);
-
-      // If role removed admin access → reload UI
-      window.location.reload();
-    }
+    return newRole;
 
   } catch (err) {
-    console.error("Role refresh failed");
+    console.log("Role refresh skipped (not logged in)");
+    return null;
   }
 };
