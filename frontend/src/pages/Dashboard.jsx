@@ -4,6 +4,7 @@ import UploadForm from "../components/UploadForm";
 import api from "../services/api";
 import BlockchainViewer from "../components/BlockchainViewer";
 import { refreshUserRole } from "../services/authSync";
+import socket from "../services/socket";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ export default function Dashboard() {
   const [statusMap, setStatusMap] = useState({});
   const [error, setError] = useState("");
 
-  // ✅ ROLE STATE (auto updates UI)
+  // ✅ role state (reactive)
   const [role, setRole] = useState(localStorage.getItem("role"));
 
   // ==========================
@@ -21,6 +22,7 @@ export default function Dashboard() {
   // ==========================
   const logout = () => {
     localStorage.clear();
+    socket.disconnect();
     navigate("/");
   };
 
@@ -50,21 +52,21 @@ export default function Dashboard() {
   // Fetch Integrity Status
   // ==========================
   const fetchIntegrityStatus = async (list) => {
-    const statusResults = {};
+    const results = {};
 
     await Promise.all(
       list.map(async (item) => {
         try {
           const res = await api.get(`/evidence/verify/${item._id}`);
-          statusResults[item._id] =
+          results[item._id] =
             res.data.forensicReport.overallValid;
         } catch {
-          statusResults[item._id] = false;
+          results[item._id] = false;
         }
       })
     );
 
-    setStatusMap(statusResults);
+    setStatusMap(results);
   };
 
   // ==========================
@@ -86,22 +88,45 @@ export default function Dashboard() {
   };
 
   // ==========================
-  // AUTO ROLE REFRESH
+  // ROLE SYNC FUNCTION
   // ==========================
   const syncRole = async () => {
     const newRole = await refreshUserRole();
-
     if (!newRole) return;
+
+    const previousRole = role;
 
     // update UI
     setRole(newRole);
 
-    // if admin rights removed → force logout
-    if (role === "admin" && newRole !== "admin") {
-      alert("Your admin privileges were revoked.");
+    // admin privilege revoked
+    if (previousRole === "admin" && newRole !== "admin") {
+      alert("⚠️ Your admin privileges were revoked.");
       logout();
     }
   };
+
+  // ==========================
+  // SOCKET ROLE UPDATE LISTENER
+  // ==========================
+  useEffect(() => {
+    socket.on("roleUpdated", ({ userId, role: newRole }) => {
+      const myId = localStorage.getItem("userId");
+
+      if (userId === myId) {
+        localStorage.setItem("role", newRole);
+        setRole(newRole);
+
+        alert("⚠️ Your permissions were updated.");
+
+        if (newRole !== "admin" && role === "admin") {
+          logout();
+        }
+      }
+    });
+
+    return () => socket.off("roleUpdated");
+  }, [role]);
 
   // ==========================
   // Load On Mount
@@ -109,7 +134,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchEvidence();
 
-    // refresh role every 15 sec
+    // refresh role every 15 seconds
     const interval = setInterval(syncRole, 15000);
 
     return () => clearInterval(interval);
@@ -118,9 +143,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
 
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div className="flex justify-between items-center p-6 border-b border-gray-700">
-        
         <div>
           <h1 className="text-2xl font-bold">
             Forensic Evidence Vault
@@ -135,7 +159,7 @@ export default function Dashboard() {
           {(role === "admin" || role === "analyst") && (
             <button
               onClick={() => navigate("/audit")}
-              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 transition"
+              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
             >
               Audit Logs
             </button>
@@ -144,7 +168,7 @@ export default function Dashboard() {
           {role === "admin" && (
             <button
               onClick={() => navigate("/admin")}
-              className="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700 transition"
+              className="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700"
             >
               Admin Panel
             </button>
@@ -152,15 +176,14 @@ export default function Dashboard() {
 
           <button
             onClick={logout}
-            className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
+            className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
           >
             Logout
           </button>
-
         </div>
       </div>
 
-      {/* ================= CONTENT ================= */}
+      {/* CONTENT */}
       <div className="p-8 space-y-8">
 
         <UploadForm onUploadSuccess={fetchEvidence} />
@@ -170,13 +193,11 @@ export default function Dashboard() {
             Uploaded Evidence
           </h2>
 
-          {loading && <p className="text-gray-400">Loading evidence...</p>}
+          {loading && <p className="text-gray-400">Loading...</p>}
           {error && <p className="text-red-400">{error}</p>}
 
           {!loading && evidenceList.length === 0 && (
-            <p className="text-gray-400">
-              No evidence uploaded yet.
-            </p>
+            <p className="text-gray-400">No evidence uploaded yet.</p>
           )}
 
           <div className="space-y-4">
@@ -189,14 +210,10 @@ export default function Dashboard() {
                   className="p-4 bg-gray-700 rounded-lg flex justify-between items-center"
                 >
                   <div>
-                    <p className="font-semibold text-lg">
-                      {item.fileName}
-                    </p>
-
+                    <p className="font-semibold text-lg">{item.fileName}</p>
                     <p className="text-sm text-gray-400">
                       Uploaded by: {item.uploadedBy?.name}
                     </p>
-
                     <p className="text-sm text-gray-400">
                       {new Date(item.createdAt).toLocaleString()}
                     </p>
@@ -222,7 +239,7 @@ export default function Dashboard() {
 
                     <button
                       onClick={() => navigate(`/verify/${item._id}`)}
-                      className="bg-green-600 px-4 py-2 rounded hover:bg-green-700 transition"
+                      className="bg-green-600 px-4 py-2 rounded hover:bg-green-700"
                     >
                       Verify
                     </button>
@@ -230,7 +247,7 @@ export default function Dashboard() {
                     {role === "admin" && (
                       <button
                         onClick={() => simulateTamper(item._id)}
-                        className="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 transition"
+                        className="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700"
                       >
                         Tamper
                       </button>
@@ -244,7 +261,6 @@ export default function Dashboard() {
         </div>
 
         <BlockchainViewer />
-
       </div>
     </div>
   );
