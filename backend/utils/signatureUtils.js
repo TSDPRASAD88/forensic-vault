@@ -1,47 +1,27 @@
 require("dotenv").config();
 const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
 
-// Resolve key paths
-const privateKeyPath = path.resolve(process.env.PRIVATE_KEY_PATH);
-const publicKeyPath = path.resolve(process.env.PUBLIC_KEY_PATH);
+/*
+====================================================
+Load RSA keys directly from environment variables
+(Render Environment Variables)
+====================================================
+PRIVATE_KEY = -----BEGIN PRIVATE KEY-----...
+PUBLIC_KEY  = -----BEGIN PUBLIC KEY-----...
+*/
 
-/**
- * Generate RSA key pair if not exists
- */
-const generateKeyPair = () => {
-  if (!fs.existsSync(privateKeyPath) || !fs.existsSync(publicKeyPath)) {
-    console.log("Generating RSA key pair...");
+const privateKey = process.env.PRIVATE_KEY;
+const publicKey = process.env.PUBLIC_KEY;
 
-    const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
-      modulusLength: 2048,
-      publicKeyEncoding: {
-        type: "spki",
-        format: "pem"
-      },
-      privateKeyEncoding: {
-        type: "pkcs8",
-        format: "pem"
-      }
-    });
-
-    fs.writeFileSync(privateKeyPath, privateKey);
-    fs.writeFileSync(publicKeyPath, publicKey);
-
-    console.log("RSA key pair generated successfully.");
-  }
-};
-
-// Ensure keys exist at startup
-generateKeyPair();
-
-// Load keys once into memory
-const privateKey = fs.readFileSync(privateKeyPath, "utf8");
-const publicKey = fs.readFileSync(publicKeyPath, "utf8");
+// Validate keys at startup
+if (!privateKey || !publicKey) {
+  throw new Error(
+    "RSA keys are missing. Please set PRIVATE_KEY and PUBLIC_KEY in environment variables."
+  );
+}
 
 /**
- * Sign a hash using RSA-PSS (stronger padding)
+ * Sign a hash using RSA-PSS
  */
 exports.signHash = (hash) => {
   try {
@@ -56,6 +36,7 @@ exports.signHash = (hash) => {
     );
 
     return signature.toString("hex");
+
   } catch (error) {
     console.error("Signing Error:", error);
     throw new Error("Failed to sign hash");
@@ -79,6 +60,7 @@ exports.verifySignature = (hash, signature) => {
     );
 
     return isValid;
+
   } catch (error) {
     console.error("Verification Error:", error);
     return false;
@@ -86,7 +68,7 @@ exports.verifySignature = (hash, signature) => {
 };
 
 /**
- * Export public key (for frontend or auditors)
+ * Export public key
  */
 exports.getPublicKey = () => {
   return publicKey;
